@@ -195,31 +195,31 @@ ARCHITECTURE TOP_ARC OF PCIE_EP_TL IS
             cfg_tx_memAddr     => ep_cfg_tx_memAddr
            );
     -- EP MEMORY
---    EP_MEM : ENTITY WORK.EP_MEM(behaviour)
---        PORT MAP(
---            clk       => clk, 
---            rst       => rst, 
---            readMEM   => readMEM, 
---            writeMEM  => writeMEM,
---            writeData => writeData, 
---            readData  => readData, 
---            readyMEM  => readyMEM,
---            readAddr  => tx_memAddr,
---            writeAddr => rx_memAddr
---        );
+   EP_MEM : ENTITY WORK.EP_MEM(behaviour)
+       PORT MAP(
+           clk       => clk, 
+           rst       => rst, 
+           readMEM   => readMEM, 
+           writeMEM  => writeMEM,
+           writeData => writeData, 
+           readData  => readData, 
+           readyMEM  => readyMEM,
+           readAddr  => tx_memAddr,
+           writeAddr => rx_memAddr
+       );
 
---     -- Configuration Register File
---    Config_RF : ENTITY WORK.Config_RF(behaviour)
---        PORT MAP(
---            clk       => clk, 
---            rst       => rst, 
---            readRF    => ep_cfg_readRF, 
---            writeRF   => ep_cfg_writeRF,
---            writeData => ep_cfg_writeData, 
---            readData  => ep_cfg_readData, 
---            readAddr  => ep_cfg_tx_memAddr,
---            writeAddr => ep_cfg_rx_memAddr
---        );
+    -- Configuration Register File
+   Config_RF : ENTITY WORK.Config_RF(behaviour)
+       PORT MAP(
+           clk       => clk, 
+           rst       => rst, 
+           readRF    => ep_cfg_readRF, 
+           writeRF   => ep_cfg_writeRF,
+           writeData => ep_cfg_writeData, 
+           readData  => ep_cfg_readData, 
+           readAddr  => ep_cfg_tx_memAddr,
+           writeAddr => ep_cfg_rx_memAddr
+       );
     -- TLP Creator instance (Rx path)
     Receiver_inst : ENTITY WORK.TLP_Creator_Receiver_TOP(TOP_ARC)
         GENERIC MAP (3) 

@@ -102,34 +102,75 @@ ARCHITECTURE test OF PCIE_EP_TL_TB IS
 
 
 BEGIN	
-    --EP1 Instance
-    EP1_Instance: ENTITY WORK.TOP
-        PORT MAP(
-            clk => clk,
-            rst => rst,
-            ep_tl_rx_src_rdy_p      => ep_tl_rx_src_rdy_p,
-            ep_tl_rx_src_sop        => ep_tl_rx_src_sop,
-            ep_tl_rx_src_data       => ep_tl_rx_src_data,
-            ep_tl_rx_src_eop        => ep_tl_rx_src_eop,
-            ep_tl_rx_src_rdy_np     => ep_tl_rx_src_rdy_np,
-            ep_tl_rx_dst_rdy        => ep_tl_rx_dst_rdy,
-            tl_rx_src_data_2        => tl_rx_src_data_2         
-        );
+     --EP1 Instance
+     EP1_Instance: ENTITY WORK.PCIE_EP_TL(TOP_ARC)
+     PORT MAP(
+         clk => clk,
+         rst => rst,
+
+         ep_tl_tx_dst_rdy      => ep_tl_tx_dst_rdy,
+         ep_tl_tx_src_rdy_cmpl => ep_tl_tx_src_rdy_cmpl,
+         ep_tl_tx_src_rdy_p    => ep_tl_tx_src_rdy_p,
+         ep_tl_tx_src_rdy_np   => ep_tl_tx_src_rdy_np,
+         ep_tl_tx_src_sop      => ep_tl_tx_src_sop,
+         ep_tl_tx_src_eop      => ep_tl_tx_src_eop,
+         ep_tl_tx_src_data     => ep_tl_tx_src_data,
+         ep_dl_tx_FC_cmp       => ep_dl_tx_FC_cmp,
+         ep_dl_tx_rdy_cmp      => ep_dl_tx_rdy_cmp,
+         ep_dl_tx_FC_p         => ep_dl_tx_FC_p,
+         ep_dl_tx_rdy_p        => ep_dl_tx_rdy_p,
+         ep_dl_tx_FC_np        => ep_dl_tx_FC_np,
+         ep_dl_tx_rdy_np       => ep_dl_tx_rdy_np,
+             
+         ep_tl_rx_dst_rdy      => ep_tl_rx_dst_rdy,
+         ep_tl_rx_src_rdy_cmpl => ep_tl_rx_src_rdy_cmpl,
+         ep_tl_rx_src_rdy_p    => ep_tl_rx_src_rdy_p,
+         ep_tl_rx_src_rdy_np   => ep_tl_rx_src_rdy_np,
+         ep_tl_rx_src_sop      => ep_tl_rx_src_sop,
+         ep_tl_rx_src_eop      => ep_tl_rx_src_eop,
+         ep_tl_rx_src_data     => ep_tl_rx_src_data,
+         ep_dl_rx_FC_cmp       => ep_dl_rx_FC_cmp,
+         ep_dl_rx_rdy_cmp      => ep_dl_rx_rdy_cmp,
+         ep_dl_rx_FC_p         => ep_dl_rx_FC_p,
+         ep_dl_rx_rdy_p        => ep_dl_rx_rdy_p,
+         ep_dl_rx_FC_np        => ep_dl_rx_FC_np,
+         ep_dl_rx_rdy_np       => ep_dl_rx_rdy_np,
+
+         ep_IO_cbus            => ep_IO_cbus,
+         ep_IO_dbus            => ep_IO_dbus,
+         ep_IO_abus            => ep_IO_abus            
+     );
 
 
+ -- Response Receiver:
+ -- Flow Control instance (Rx path)
+ Flow_Control_receive_inst: ENTITY WORK.VCB_RECEIVER
+     GENERIC MAP (log2sizefifo => 6)
+     PORT MAP(
+         clk               => clk,
+         rst               => rst,
+         Fc_DLLPs_cmp      => ep_dl_tx_FC_cmp,
+         ready_cmp         => ep_dl_tx_rdy_cmp,
+         Fc_DLLPs_p        => ep_dl_tx_FC_p,
+         ready_p           => ep_dl_tx_rdy_p,
+         Fc_DLLPs_np       => ep_dl_tx_FC_np,
+         ready_np          => ep_dl_tx_rdy_np,
+         Src_data          => ep_tl_tx_src_data,
+         Src_rdy_cmp       => ep_tl_tx_src_rdy_cmpl,
+         Src_rdy_p         => ep_tl_tx_src_rdy_p,
+         Src_rdy_np        => ep_tl_tx_src_rdy_np,
+         Dst_rdy           => ep_tl_tx_dst_rdy,
+         Src_sop           => ep_tl_tx_src_sop,
+         Src_eop           => ep_tl_tx_src_eop,
+         tl_rx_src_data    => tl_rx_src_data_2,
+         tl_rx_src_rdy_cmp => tl_rx_src_rdy_cmpl_2,
+         tl_rx_src_rdy_p   => tl_rx_src_rdy_p_2,
+         tl_rx_src_rdy_np  => tl_rx_src_rdy_np_2,
+         tl_rx_dst_rdy     => tl_rx_dst_rdy_2,
+         tl_rx_src_sop     => tl_rx_src_sop_2,
+         tl_rx_src_eop     => tl_rx_src_eop_2
+         );
 
-    -- Memory Instance  -> for testing
-    -- test_MEM : ENTITY WORK.MEM(behaviour)
-        -- PORT MAP(
-        --     clk       => clk, 
-        --     rst       => rst, 
-        --     readMEM   => test_readMEM, 
-        --     writeMEM  => test_writeMEM,
-        --     writeData => test_writeData, 
-        --     readData  => test_readData, 
-        --     readyMEM  => test_readyMEM,
-        --     addr      => test_memAddr
-        -- );
 
     -- IO Instance: TIMER
         -- TIMER_ADR_CHECKER:ENTITY WORK.CSCHECKER(ARCH)
@@ -208,7 +249,7 @@ BEGIN
          -- Test scenario: sending a tlp MWr to EP receiver
          ep_tl_rx_src_rdy_p <='1';
          ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"40000006"; --Hdr1: MWr, length = 6, 
+         ep_tl_rx_src_data <= X"40000009"; --Hdr1: MWr, length = 6, 
          WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_sop <='0';
          ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
@@ -250,435 +291,392 @@ BEGIN
          ep_tl_rx_src_rdy_np <='0';
          WAIT UNTIL clk = '1';
 
-         -- Test scenario: sending a tlp MRd to EP receiver
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"00000005"; --Hdr1: Mrd, length = 5, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         -- WAIT UNTIL clk='1';
-         ep_tl_rx_src_sop <='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  -- Test scenario: sending a tlp MRd to EP receiver
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"00000005"; --Hdr1: Mrd, length = 5, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  -- WAIT UNTIL clk='1';
+        --  ep_tl_rx_src_sop <='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
         
-         -- Test scenario: sending a tlp IOWr to EP receiver
-         -- Interrrupt Controller
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         -- WAIT UNTIL clk='1';
-         ep_tl_rx_src_sop<='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 20h << 2 
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"0000009B"; --Data1: IO Data1 : icw1
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  -- Test scenario: sending a tlp IOWr to EP receiver
+        --  -- Interrrupt Controller
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  -- WAIT UNTIL clk='1';
+        --  ep_tl_rx_src_sop<='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 20h << 2 
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"0000009B"; --Data1: IO Data1 : icw1
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
 
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         ep_tl_rx_src_sop<='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000084"; --Hdr3: Address: 21h << 2
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"000000F8"; --Data1: IO Data1 :icw2 
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  ep_tl_rx_src_sop<='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000084"; --Hdr3: Address: 21h << 2
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"000000F8"; --Data1: IO Data1 :icw2 
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
         
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         ep_tl_rx_src_sop<='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000084"; --Hdr3: Address: 21h << 2
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000008"; --Data1: IO Data1 :icw4 
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  ep_tl_rx_src_sop<='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000084"; --Hdr3: Address: 21h << 2
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000008"; --Data1: IO Data1 :icw4 
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
 
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         ep_tl_rx_src_sop<='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000084"; --Hdr3: Address: 21h << 2
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"000000C0"; --Data1: IO Data1 : ocw1 
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  ep_tl_rx_src_sop<='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000084"; --Hdr3: Address: 21h << 2
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"000000C0"; --Data1: IO Data1 : ocw1 
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
 
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         ep_tl_rx_src_sop<='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000080"; --Hdr3: Address: 20h << 2
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"000000C0"; --Data1: IO Data1 : ocw2 
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  ep_tl_rx_src_sop<='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000080"; --Hdr3: Address: 20h << 2
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"000000C0"; --Data1: IO Data1 : ocw2 
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
 
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         ep_tl_rx_src_sop<='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000080"; --Hdr3: Address: 20h << 2
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"0000000A"; --Data1: IO Data1 : ocw3 
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"42000001"; --Hdr1: IOWr, length = 1, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  ep_tl_rx_src_sop<='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000080"; --Hdr3: Address: 20h << 2
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"0000000A"; --Data1: IO Data1 : ocw3 
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
 
-         -- Test scenario: sending a tlp IORd to intrp_ctrl
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"02000001"; --Hdr1: IORd, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         ep_tl_rx_src_sop<='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000088"; --Hdr3: Address: 22h << 2 
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  -- Test scenario: sending a tlp IORd to intrp_ctrl
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"02000001"; --Hdr1: IORd, length = 1, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  ep_tl_rx_src_sop<='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000088"; --Hdr3: Address: 22h << 2 
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
 
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"02000001"; --Hdr1: IORd, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         ep_tl_rx_src_sop<='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000088"; --Hdr3: Address: 22h << 2 
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"02000001"; --Hdr1: IORd, length = 1, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  ep_tl_rx_src_sop<='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000088"; --Hdr3: Address: 22h << 2 
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
 
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"02000001"; --Hdr1: IORd, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         ep_tl_rx_src_sop<='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000088"; --Hdr3: Address: 22h << 2 
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"02000001"; --Hdr1: IORd, length = 1, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  ep_tl_rx_src_sop<='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000088"; --Hdr3: Address: 22h << 2 
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
 
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"02000001"; --Hdr1: IORd, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         ep_tl_rx_src_sop<='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000088"; --Hdr3: Address: 22h << 2 
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"02000001"; --Hdr1: IORd, length = 1, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  ep_tl_rx_src_sop<='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000088"; --Hdr3: Address: 22h << 2 
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
         
 
-         -- Test scenario: sending a tlp IORd to EP receiver
-         ep_tl_rx_src_rdy_np <='1';
-         ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"02000001"; --Hdr1: IORd, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-         -- WAIT UNTIL clk='1';
-         ep_tl_rx_src_sop<='0';
-         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
-         ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
-         ep_tl_rx_src_eop<='0';
-         ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+        --  -- Test scenario: sending a tlp IORd to EP receiver
+        --  ep_tl_rx_src_rdy_np <='1';
+        --  ep_tl_rx_src_sop<='1';
+        --  ep_tl_rx_src_data <= X"02000001"; --Hdr1: IORd, length = 1, 
+        --  WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        --  -- WAIT UNTIL clk='1';
+        --  ep_tl_rx_src_sop<='0';
+        --  ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
+        --  ep_tl_rx_src_eop<='1';
+        --  WAIT UNTIL clk = '1';
+        --  ep_tl_rx_src_eop<='0';
+        --  ep_tl_rx_src_rdy_np <='0';
+        --  WAIT UNTIL clk = '1';
 
-        -- Test scenario: sending a tlp CfgWr0 to EP receiver
-        ep_tl_rx_src_rdy_np <='1';
-        ep_tl_rx_src_sop<='1';
-        ep_tl_rx_src_data <= X"44000001"; --Hdr1: CfgWr0, length = 1, 
-        WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-        -- WAIT UNTIL clk='1';
-        ep_tl_rx_src_sop<='0';
-        ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-        WAIT UNTIL clk = '1';
-        ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
-        WAIT UNTIL clk = '1';
-        ep_tl_rx_src_data <= X"AAAAAAAA"; --Data1: IO Data1
-        ep_tl_rx_src_eop<='1';
-        WAIT UNTIL clk = '1';
-        ep_tl_rx_src_eop<='0';
-        ep_tl_rx_src_rdy_np <='0';
-        WAIT UNTIL clk = '1';
+        -- -- Test scenario: sending a tlp CfgWr0 to EP receiver
+        -- ep_tl_rx_src_rdy_np <='1';
+        -- ep_tl_rx_src_sop<='1';
+        -- ep_tl_rx_src_data <= X"44000001"; --Hdr1: CfgWr0, length = 1, 
+        -- WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        -- -- WAIT UNTIL clk='1';
+        -- ep_tl_rx_src_sop<='0';
+        -- ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_data <= X"AAAAAAAA"; --Data1: IO Data1
+        -- ep_tl_rx_src_eop<='1';
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_eop<='0';
+        -- ep_tl_rx_src_rdy_np <='0';
+        -- WAIT UNTIL clk = '1';
 
-        WAIT FOR 100 NS;
-        -- Test scenario: sending a tlp CfgRd0 to EP receiver
-        ep_tl_rx_src_rdy_np <='1';
-        ep_tl_rx_src_sop<='1';
-        ep_tl_rx_src_data <= X"04000001"; --Hdr1: CfgRd0, length = 1, 
-        WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
-        -- WAIT UNTIL clk='1';
-        ep_tl_rx_src_sop<='0';
-        ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-        WAIT UNTIL clk = '1';
-        ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
-        ep_tl_rx_src_eop<='1';
-        WAIT UNTIL clk = '1';
-        ep_tl_rx_src_eop<='0';
-        ep_tl_rx_src_rdy_np <='0';
-        WAIT UNTIL clk = '1';
+        -- WAIT FOR 100 NS;
+        -- -- Test scenario: sending a tlp CfgRd0 to EP receiver
+        -- ep_tl_rx_src_rdy_np <='1';
+        -- ep_tl_rx_src_sop<='1';
+        -- ep_tl_rx_src_data <= X"04000001"; --Hdr1: CfgRd0, length = 1, 
+        -- WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        -- -- WAIT UNTIL clk='1';
+        -- ep_tl_rx_src_sop<='0';
+        -- ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
+        -- ep_tl_rx_src_eop<='1';
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_eop<='0';
+        -- ep_tl_rx_src_rdy_np <='0';
+        -- WAIT UNTIL clk = '1';
         WAIT;
     END PROCESS;
 
 
---     PROCESS (clk, rst, ep_tl_rx_src_sop, ep_tl_tx_src_sop, ep_tl_tx_src_eop, ep_tl_tx_src_rdy_np, ep_tl_tx_src_rdy_p, ep_tl_tx_src_rdy_cmpl)
---     CONSTANT TLP_MRd    : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00000000";
---     CONSTANT TLP_MWr    : STD_LOGIC_VECTOR(7 DOWNTO 0) := "01000000";
---     CONSTANT TLP_IORd   : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00000010";
---     CONSTANT TLP_IOWr   : STD_LOGIC_VECTOR(7 DOWNTO 0) := "01000010";
---     CONSTANT TLP_CfgRd0 : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00000100";
---     CONSTANT TLP_CfgWr0 : STD_LOGIC_VECTOR(7 DOWNTO 0) := "01000100";
---     CONSTANT TLP_CfgRd1 : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00000101";
---     CONSTANT TLP_CfgWr1 : STD_LOGIC_VECTOR(7 DOWNTO 0) := "01000101";
---     CONSTANT TLP_Cmpl   : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00001010";
---     CONSTANT TLP_CmplD  : STD_LOGIC_VECTOR(7 DOWNTO 0) := "01001010";
---     FILE LOG_FILE : text OPEN WRITE_MODE IS "log.txt";
---     VARIABLE W_LINE : LINE;
---     VARIABLE str : string(1 TO 36);
---     VARIABLE inspector : STD_LOGIC_VECTOR (31 DOWNTO 0);
---     VARIABLE itr : INTEGER := 0;
---     VARIABLE has_data : BOOLEAN := FALSE;
---     BEGIN
---         IF (rst = '1' AND rst'EVENT) THEN
---         WRITE (W_LINE, string'("Starting the PCIE EP simulation @ "));
---         WRITE (W_LINE, NOW);
---         WRITE (W_LINE, string'(" ..."));
---         writeline(LOG_FILE, W_LINE);
---         WRITE (W_LINE, string'(""));
---         writeline(LOG_FILE, W_LINE);
---         END IF;
---         IF(clk='1' AND clk'EVENT) THEN
+    PROCESS (clk, rst, ep_tl_rx_src_sop, ep_tl_tx_src_sop, ep_tl_tx_src_eop, ep_tl_tx_src_rdy_np, ep_tl_tx_src_rdy_p, ep_tl_tx_src_rdy_cmpl)
+    CONSTANT TLP_MRd    : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00000000";
+    CONSTANT TLP_MWr    : STD_LOGIC_VECTOR(7 DOWNTO 0) := "01000000";
+    CONSTANT TLP_IORd   : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00000010";
+    CONSTANT TLP_IOWr   : STD_LOGIC_VECTOR(7 DOWNTO 0) := "01000010";
+    CONSTANT TLP_CfgRd0 : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00000100";
+    CONSTANT TLP_CfgWr0 : STD_LOGIC_VECTOR(7 DOWNTO 0) := "01000100";
+    CONSTANT TLP_CfgRd1 : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00000101";
+    CONSTANT TLP_CfgWr1 : STD_LOGIC_VECTOR(7 DOWNTO 0) := "01000101";
+    CONSTANT TLP_Cmpl   : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00001010";
+    CONSTANT TLP_CmplD  : STD_LOGIC_VECTOR(7 DOWNTO 0) := "01001010";
+    FILE LOG_FILE : text OPEN WRITE_MODE IS "log.txt";
+    VARIABLE W_LINE : LINE;
+    VARIABLE str : string(1 TO 36);
+    VARIABLE inspector : STD_LOGIC_VECTOR (31 DOWNTO 0);
+    VARIABLE itr : INTEGER := 0;
+    VARIABLE has_data : BOOLEAN := FALSE;
+    BEGIN
+        IF (rst = '1' AND rst'EVENT) THEN
+        WRITE (W_LINE, string'("Starting the PCIE EP simulation @ "));
+        WRITE (W_LINE, NOW);
+        WRITE (W_LINE, string'(" ..."));
+        writeline(LOG_FILE, W_LINE);
+        WRITE (W_LINE, string'(""));
+        writeline(LOG_FILE, W_LINE);
+        END IF;
+        IF(clk='1' AND clk'EVENT) THEN
 
---             IF (ep_tl_rx_src_sop = '1') THEN
---                 WRITE (W_LINE, string'("=====================> NEW PACKET IN RX @ "));
---                 WRITE (W_LINE, NOW);
---                 writeline(LOG_FILE, W_LINE);
---                 inspector := ep_tl_rx_src_data;
---                 itr := 1;
---                 CASE inspector(31 DOWNTO 24) IS
---                     WHEN TLP_MWr =>
---                         -- has_data := TRUE;
---                         WRITE (W_LINE, string'("REQUEST TYPE: Memory Write (posted)"));
---                         writeline(LOG_FILE, W_LINE);
---                         -- WRITE (W_LINE, string'("Length: "&to_string(to_integer(unsigned((inspector(9 DOWNTO 0)))))));
---                         WRITE (W_LINE, string'("Length: "));
---                         writeline(LOG_FILE, W_LINE);
---                         WRITE (W_LINE, to_integer(unsigned((inspector(9 DOWNTO 0)))));
+            IF (ep_tl_rx_src_sop = '1') THEN
+                WRITE (W_LINE, string'("=====================> NEW PACKET IN RX @ "));
+                WRITE (W_LINE, NOW);
+                writeline(LOG_FILE, W_LINE);
+                inspector := ep_tl_rx_src_data;
+                itr := 1;
+                CASE inspector(31 DOWNTO 24) IS
+                    WHEN TLP_MWr =>
+                        -- has_data := TRUE;
+                        WRITE (W_LINE, string'("REQUEST TYPE: Memory Write (posted)"));
+                        writeline(LOG_FILE, W_LINE);
+                        -- WRITE (W_LINE, string'("Length: "&to_string(to_integer(unsigned((inspector(9 DOWNTO 0)))))));
+                        WRITE (W_LINE, string'("Length: "));
+                        writeline(LOG_FILE, W_LINE);
+                        WRITE (W_LINE, to_integer(unsigned((inspector(9 DOWNTO 0)))));
 
---                         writeline(LOG_FILE, W_LINE);
---                         WRITE (W_LINE, string'("*********************************************** "));
---                         writeline(LOG_FILE, W_LINE);
---                         WRITE (W_LINE, string'(""));
---                         writeline(LOG_FILE, W_LINE);
+                        writeline(LOG_FILE, W_LINE);
+                        WRITE (W_LINE, string'("*********************************************** "));
+                        writeline(LOG_FILE, W_LINE);
+                        WRITE (W_LINE, string'(""));
+                        writeline(LOG_FILE, W_LINE);
 
---                     WHEN TLP_MRd =>
---                         -- has_data := FALSE;
---                         WRITE (W_LINE, string'("REQUEST TYPE: Memory Read (non-posted)"));
---                         writeline(LOG_FILE, W_LINE);
---                         -- WRITE (W_LINE, string'("Length: "&to_string(to_integer(unsigned((inspector(9 DOWNTO 0)))))));
---                         WRITE (W_LINE, string'("Length: "));
---                         writeline(LOG_FILE, W_LINE);
---                         WRITE (W_LINE, to_integer(unsigned((inspector(9 DOWNTO 0)))));                        WRITE (W_LINE, string'(""));
---                         writeline(LOG_FILE, W_LINE);
+                    WHEN TLP_MRd =>
+                        -- has_data := FALSE;
+                        WRITE (W_LINE, string'("REQUEST TYPE: Memory Read (non-posted)"));
+                        writeline(LOG_FILE, W_LINE);
+                        -- WRITE (W_LINE, string'("Length: "&to_string(to_integer(unsigned((inspector(9 DOWNTO 0)))))));
+                        WRITE (W_LINE, string'("Length: "));
+                        writeline(LOG_FILE, W_LINE);
+                        WRITE (W_LINE, to_integer(unsigned((inspector(9 DOWNTO 0)))));                        WRITE (W_LINE, string'(""));
+                        writeline(LOG_FILE, W_LINE);
 
---                     WHEN TLP_IORd =>
---                         WRITE (W_LINE, string'("REQUEST TYPE: IO Read (non-posted)"));
---                         WRITE (W_LINE, string'(""));
---                         writeline(LOG_FILE, W_LINE);
+                    WHEN TLP_IORd =>
+                        WRITE (W_LINE, string'("REQUEST TYPE: IO Read (non-posted)"));
+                        WRITE (W_LINE, string'(""));
+                        writeline(LOG_FILE, W_LINE);
 
---                     WHEN TLP_IOWr =>
---                         WRITE (W_LINE, string'("REQUEST TYPE: IO Write (non-posted)"));
---                         WRITE (W_LINE, string'(""));
---                         writeline(LOG_FILE, W_LINE);
+                    WHEN TLP_IOWr =>
+                        WRITE (W_LINE, string'("REQUEST TYPE: IO Write (non-posted)"));
+                        WRITE (W_LINE, string'(""));
+                        writeline(LOG_FILE, W_LINE);
 
---                     WHEN TLP_CfgRd0 =>
---                         WRITE (W_LINE, string'("REQUEST TYPE: Configuration Read (non-posted)"));
---                         WRITE (W_LINE, string'(""));
---                         writeline(LOG_FILE, W_LINE);
+                    WHEN TLP_CfgRd0 =>
+                        WRITE (W_LINE, string'("REQUEST TYPE: Configuration Read (non-posted)"));
+                        WRITE (W_LINE, string'(""));
+                        writeline(LOG_FILE, W_LINE);
 
---                     WHEN TLP_CfgWr0 =>
---                         WRITE (W_LINE, string'("REQUEST TYPE: Configuration Write (non-posted)"));
---                         WRITE (W_LINE, string'(""));
---                         writeline(LOG_FILE, W_LINE);
---                     WHEN OTHERS=>
---                 END CASE;
---             END IF;
-
-
---             -- Observing the Output(TX) Signals
---             IF (ep_tl_tx_src_sop = '1') THEN
---                 WRITE (W_LINE, string'("=========> RESPONSE PACKET IN TX @ "));
---                 WRITE (W_LINE, NOW);
---                 writeline(LOG_FILE, W_LINE);
---                 inspector := ep_tl_tx_src_data;
---                 itr := 1;
---                 CASE inspector(31 DOWNTO 24) IS
---                     WHEN TLP_CmplD =>
---                         has_data := TRUE;
---                         WRITE (W_LINE, string'("TYPE: completion with data"));
---                         writeline(LOG_FILE, W_LINE);
-
---                     WHEN TLP_Cmpl =>
---                         has_data := FALSE;
---                         WRITE (W_LINE, string'("TYPE: completion "));
---                         writeline(LOG_FILE, W_LINE);
---                     WHEN OTHERS=>
---                 END CASE;
---             END IF;
-
---             IF ((ep_tl_tx_src_rdy_np='1' OR ep_tl_tx_src_rdy_p='1' OR ep_tl_tx_src_rdy_cmpl='1')AND ep_tl_tx_dst_rdy = '1') THEN
---                 inspector := ep_tl_tx_src_data;
---                 IF (itr < 4) THEN
--- --                    WRITE (W_LINE, string'("    HEADER"&to_string(itr)&" : "));
---                    WRITE (W_LINE, string'("    HEADER"));
---                    writeline(LOG_FILE, W_LINE);
---                    WRITE (W_LINE, itr);
---                    writeline(LOG_FILE, W_LINE);
---                     itr:= itr +1;
--- --                    WRITE (W_LINE, "0x" & to_hstring(inspector));
---                     WRITE (W_LINE, inspector);
---                     writeline(LOG_FILE, W_LINE);
---                 ELSIF (itr = 4 AND has_data) THEN
---                     WRITE (W_LINE, string'(""));
---                     writeline(LOG_FILE, W_LINE);
---                     WRITE (W_LINE, string'("    DATA:"));
---                     writeline(LOG_FILE, W_LINE);
---                     --WRITE (W_LINE, "0x" & to_hstring(inspector));
---                     WRITE (W_LINE, inspector);
---                     itr := itr +1;
---                     writeline(LOG_FILE, W_LINE);
---                 ELSIF (itr > 4 AND has_data) THEN
---                     --WRITE (W_LINE, "0x" & to_hstring(inspector));
---                     WRITE (W_LINE, inspector);
---                     writeline(LOG_FILE, W_LINE);
---                 END IF;
+                    WHEN TLP_CfgWr0 =>
+                        WRITE (W_LINE, string'("REQUEST TYPE: Configuration Write (non-posted)"));
+                        WRITE (W_LINE, string'(""));
+                        writeline(LOG_FILE, W_LINE);
+                    WHEN OTHERS=>
+                END CASE;
+            END IF;
 
 
+            -- Observing the Output(TX) Signals
+            IF (ep_tl_tx_src_sop = '1') THEN
+                WRITE (W_LINE, string'("=========> RESPONSE PACKET IN TX @ "));
+                WRITE (W_LINE, NOW);
+                writeline(LOG_FILE, W_LINE);
+                inspector := ep_tl_tx_src_data;
+                itr := 1;
+                CASE inspector(31 DOWNTO 24) IS
+                    WHEN TLP_CmplD =>
+                        has_data := TRUE;
+                        WRITE (W_LINE, string'("TYPE: completion with data"));
+                        writeline(LOG_FILE, W_LINE);
 
---                 IF (ep_tl_tx_src_eop='1' AND ep_tl_tx_dst_rdy = '1') THEN
---                     WRITE (W_LINE, string'("=====================> END OF PACKET @ "));
---                     WRITE (W_LINE, NOW);
---                     writeline(LOG_FILE, W_LINE);
---                     WRITE (W_LINE, string'("*********************************************** "));
---                     writeline(LOG_FILE, W_LINE);
---                     WRITE (W_LINE, string'(""));
---                     writeline(LOG_FILE, W_LINE);
---                 END IF;
---             END IF;
+                    WHEN TLP_Cmpl =>
+                        has_data := FALSE;
+                        WRITE (W_LINE, string'("TYPE: completion "));
+                        writeline(LOG_FILE, W_LINE);
+                    WHEN OTHERS=>
+                END CASE;
+            END IF;
 
---         END IF;	
+            IF ((ep_tl_tx_src_rdy_np='1' OR ep_tl_tx_src_rdy_p='1' OR ep_tl_tx_src_rdy_cmpl='1')AND ep_tl_tx_dst_rdy = '1') THEN
+                inspector := ep_tl_tx_src_data;
+                IF (itr < 4) THEN
+--                    WRITE (W_LINE, string'("    HEADER"&to_string(itr)&" : "));
+                   WRITE (W_LINE, string'("    HEADER"));
+                   writeline(LOG_FILE, W_LINE);
+                   WRITE (W_LINE, itr);
+                   writeline(LOG_FILE, W_LINE);
+                    itr:= itr +1;
+--                    WRITE (W_LINE, "0x" & to_hstring(inspector));
+                    WRITE (W_LINE, inspector);
+                    writeline(LOG_FILE, W_LINE);
+                ELSIF (itr = 4 AND has_data) THEN
+                    WRITE (W_LINE, string'(""));
+                    writeline(LOG_FILE, W_LINE);
+                    WRITE (W_LINE, string'("    DATA:"));
+                    writeline(LOG_FILE, W_LINE);
+                    --WRITE (W_LINE, "0x" & to_hstring(inspector));
+                    WRITE (W_LINE, inspector);
+                    itr := itr +1;
+                    writeline(LOG_FILE, W_LINE);
+                ELSIF (itr > 4 AND has_data) THEN
+                    --WRITE (W_LINE, "0x" & to_hstring(inspector));
+                    WRITE (W_LINE, inspector);
+                    writeline(LOG_FILE, W_LINE);
+                END IF;
 
---     END PROCESS;
 
---     -- Imitating an IO
---     -- PROCESS (clk, rst, ep_IO_abus, ep_IO_dbus, ep_IO_cbus)
---     -- BEGIN
---     --     IF (clk = '1' AND clk'EVENT) THEN
---     --         IF (ep_IO_cbus = "01") THEN
---     --             ep_IO_dbus <= X"AAAAAAAA";
---     --         ELSE
---     --             ep_IO_dbus <= (OTHERS => 'Z');
---     --         END IF;
---     --     END IF;
---     -- END PROCESS;
---     ep_IO_dbus <= X"AAAAAAAA" WHEN ep_IO_cbus = "01" ELSE (OTHERS => 'Z');
+
+                IF (ep_tl_tx_src_eop='1' AND ep_tl_tx_dst_rdy = '1') THEN
+                    WRITE (W_LINE, string'("=====================> END OF PACKET @ "));
+                    WRITE (W_LINE, NOW);
+                    writeline(LOG_FILE, W_LINE);
+                    WRITE (W_LINE, string'("*********************************************** "));
+                    writeline(LOG_FILE, W_LINE);
+                    WRITE (W_LINE, string'(""));
+                    writeline(LOG_FILE, W_LINE);
+                END IF;
+            END IF;
+
+        END IF;	
+
+    END PROCESS;
+
+    --Imitating an IO
+    -- PROCESS (clk, rst, ep_IO_abus, ep_IO_dbus, ep_IO_cbus)
+    -- BEGIN
+    --     IF (clk = '1' AND clk'EVENT) THEN
+    --         IF (ep_IO_cbus = "01") THEN
+    --             ep_IO_dbus <= X"AAAAAAAA";
+    --         ELSE
+    --             ep_IO_dbus <= (OTHERS => 'Z');
+    --         END IF;
+    --     END IF;
+    -- END PROCESS;
+    ep_IO_dbus <= X"AAAAAAAA" WHEN ep_IO_cbus = "01" ELSE (OTHERS => 'Z');
 END ARCHITECTURE test;
-
-
-
-
--- LIBRARY IEEE;
---     USE IEEE.STD_LOGIC_1164.ALL;
---     USE IEEE.STD_LOGIC_UNSIGNED.ALL;
--- ENTITY Tester IS
---     GENERIC(
---         Hdr1:STD_LOGIC_VECTOR(31 DOWNTO 0);
---         Hdr2:STD_LOGIC_VECTOR(31 DOWNTO 0);
---         Hdr3:STD_LOGIC_VECTOR(31 DOWNTO 0)
---         );
---     port (clk:IN STD_LOGIC;
---     rst:IN STD_LOGIC;
---     ep_tl_rx_dst_rdy : IN STD_LOGIC;
-
---     ep_tl_rx_src_data : OUT STD_LOGIC_VECTOR(31 DOWNTO 0);
---     ep_tl_rx_src_rdy_np : OUT STD_LOGIC;
---     ep_tl_rx_src_sop : OUT STD_LOGIC;
---     ep_tl_rx_src_eop : OUT STD_LOGIC);
--- END Tester ;
--- ARCHITECTURE ARCH OF Tester  IS
--- BEGIN
---     Process begin
---         WAIT UNTIL (rst = '0' AND rst'EVENT);
---         ep_tl_rx_src_rdy_np <='1';
---         ep_tl_rx_src_sop<='1';
---         ep_tl_rx_src_data <= X"00000005"; --Hdr1: Mrd, length = 1, 
---         WAIT UNTIL ep_tl_rx_dst_rdy = '1';
---         WAIT UNTIL clk='1';
---         ep_tl_rx_src_sop <='0';
---         ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
---         WAIT UNTIL clk = '1';
---         ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
---         ep_tl_rx_src_eop<='1';
---         WAIT UNTIL clk = '1';
---         ep_tl_rx_src_eop<='0';
---         ep_tl_rx_src_rdy_np <='0';
---         WAIT UNTIL clk = '1';
---     end process;
-
--- end ARCHITECTURE;

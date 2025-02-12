@@ -596,9 +596,9 @@ BEGIN
         IF ((push = '1') AND (full_sig='0')) THEN
             mem(to_integer(unsigned(wr_point))) <= data_in;
         END IF;
-        --IF ((pop = '1') AND (clk = '1') AND (empty_sig='0')) THEN          -------comment for synthesis-------------
-        --    mem(to_integer(unsigned(rd_point))) <= x"ffffffff"; -------comment for synthesis-------------
-        --END IF; -------comment for synthesis-------------
+        IF ((pop = '1') AND (clk = '1') AND (empty_sig='0')) THEN          -------comment for synthesis-------------
+           mem(to_integer(unsigned(rd_point))) <= x"ffffffff"; -------comment for synthesis-------------
+        END IF; -------comment for synthesis-------------
        end if;
 	 END PROCESS;
     data_top <= mem(to_integer(unsigned(rd_point)));
