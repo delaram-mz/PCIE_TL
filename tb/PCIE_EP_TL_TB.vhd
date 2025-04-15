@@ -86,18 +86,22 @@ ARCHITECTURE test OF PCIE_EP_TL_TB IS
     SIGNAL ep_IO_dbus : STD_LOGIC_VECTOR (31 DOWNTO 0);
     SIGNAL ep_IO_abus : STD_LOGIC_VECTOR (31 DOWNTO 0);
 
-    --Test Mem signal
-    SIGNAL test_readMEM   : STD_LOGIC;
-    SIGNAL test_writeMEM  : STD_LOGIC;
-    SIGNAL test_writeData : STD_LOGIC_VECTOR(31 DOWNTO 0);
-    SIGNAL test_readData  : STD_LOGIC_VECTOR(31 DOWNTO 0);
-    SIGNAL test_readyMEM  : STD_LOGIC;
-    SIGNAL test_memAddr   : STD_LOGIC_VECTOR (9 dOWNTO 0);
+    --PHY interface
+    SIGNAL ep_phy_send_pm_msg : STD_LOGIC_VECTOR (2 DOWNTO 0);
+    SIGNAL ep_phy_pm_msg_sent : STD_LOGIC;
+    SIGNAL ep_phy_incoming_pm_msg : STD_LOGIC_VECTOR (2 DOWNTO 0);
+    SIGNAL ep_phy_pm_msg_received : STD_LOGIC;
  
     -- Added by Tina
     SIGNAL CSBAR,OUT1,OUT2,OUT0 : STD_LOGIC;
     SIGNAL INTA, CS_bar_intrp, INT : STD_LOGIC;
     SIGNAL IR_sig                  : STD_LOGIC_VECTOR(7 DOWNTO 0);
+
+
+    CONSTANT PM_MSG_CODE_Active_State_Nack : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00010100";
+    CONSTANT PM_MSG_CODE_PME : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00011000";
+    CONSTANT PM_MSG_CODE_Turn_Off : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00011001";
+    CONSTANT PM_MSG_CODE_TO_Ack : STD_LOGIC_VECTOR(7 DOWNTO 0) := "00011011";
 
 
 
@@ -138,7 +142,12 @@ BEGIN
 
          ep_IO_cbus            => ep_IO_cbus,
          ep_IO_dbus            => ep_IO_dbus,
-         ep_IO_abus            => ep_IO_abus            
+         ep_IO_abus            => ep_IO_abus,
+         
+        ep_phy_send_pm_msg => ep_phy_send_pm_msg, 
+        ep_phy_pm_msg_sent => ep_phy_pm_msg_sent, 
+        ep_phy_incoming_pm_msg => ep_phy_incoming_pm_msg, 
+        ep_phy_pm_msg_received => ep_phy_pm_msg_received
      );
 
 
@@ -238,6 +247,16 @@ BEGIN
     --Clock generation:
     clk <= NOT clk AFTER 1 NS;
 
+    PM_Interface: PROCESS begin
+        ep_phy_send_pm_msg <= "000";
+        WAIT FOR 50 NS;
+        ep_phy_send_pm_msg <= "100";
+        WAIT UNTIL (ep_phy_pm_msg_sent = '1');
+        WAIT FOR 10 NS; -- assuming phy has delays
+        ep_phy_send_pm_msg <= "000";
+        WAIT;
+    END PROCESS;
+
     PROCESS BEGIN
         rst <= '1';
         WAIT FOR 0 NS;
@@ -249,29 +268,36 @@ BEGIN
          -- Test scenario: sending a tlp MWr to EP receiver
          ep_tl_rx_src_rdy_p <='1';
          ep_tl_rx_src_sop<='1';
-         ep_tl_rx_src_data <= X"40000009"; --Hdr1: MWr, length = 6, 
+         ep_tl_rx_src_data <= X"40000006"; --Hdr1: MWr, length = 6, change lenth to send malformed TLP
          WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_sop <='0';
          ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_data <= X"11111111"; --Data1
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_data <= X"22222222"; --Data2
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_data <= X"33333333"; --Data3
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_data <= X"44444444"; --Data4
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_data <= X"55555555"; --Data5
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_data <= X"66666666"; --Data6
          ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_eop<='0';
          ep_tl_rx_src_rdy_p <='0';
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+
+
+        --  ep_phy_send_pm_msg <= "100";
+        --  WAIT UNTIL (ep_phy_pm_msg_sent = '1');
+        --  ep_phy_send_pm_msg <= "000";
+
 
 
 
@@ -279,19 +305,36 @@ BEGIN
          ep_tl_rx_src_rdy_np <='1';
          ep_tl_rx_src_sop<='1';
          ep_tl_rx_src_data <= X"00000006"; --Hdr1: Mrd, length = 1, 
-         WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+         WAIT UNTIL (clk='1' AND ep_tl_rx_dst_rdy = '1');
          -- WAIT UNTIL clk='1';
          ep_tl_rx_src_sop <='0';
          ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
          ep_tl_rx_src_eop<='1';
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL (clk='1' AND ep_tl_rx_dst_rdy = '1');
          ep_tl_rx_src_eop<='0';
          ep_tl_rx_src_rdy_np <='0';
-         WAIT UNTIL clk = '1';
+         WAIT UNTIL (clk='1' AND ep_tl_rx_dst_rdy = '1');
 
-        --  -- Test scenario: sending a tlp MRd to EP receiver
+
+         -- Test scenario: sending a tlp PM MSG to EP receiver (downstream : PM_Turn_Off)
+         ep_tl_rx_src_rdy_p <='1';
+         ep_tl_rx_src_sop <='1';
+         ep_tl_rx_src_data <= X"19000000"; --Hdr1: MSG, length = 0, 
+         WAIT UNTIL (clk='1' AND ep_tl_rx_dst_rdy = '1');
+         -- WAIT UNTIL clk='1';
+         ep_tl_rx_src_sop <='0';
+         ep_tl_rx_src_data <= X"FFFF00"&PM_MSG_CODE_Turn_Off; --Hdr2: req_ID = X"FFFF", code turn off
+         WAIT UNTIL (clk='1' AND ep_tl_rx_dst_rdy = '1');
+         ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
+         ep_tl_rx_src_eop<='1';
+         WAIT UNTIL (clk='1' AND ep_tl_rx_dst_rdy = '1');
+         ep_tl_rx_src_eop<='0';
+         ep_tl_rx_src_rdy_p <='0';
+         WAIT UNTIL (clk='1' AND ep_tl_rx_dst_rdy = '1');
+
+--        --  Test scenario: sending a tlp MRd to EP receiver
         --  ep_tl_rx_src_rdy_np <='1';
         --  ep_tl_rx_src_sop<='1';
         --  ep_tl_rx_src_data <= X"00000005"; --Hdr1: Mrd, length = 5, 
@@ -480,7 +523,9 @@ BEGIN
         --  ep_tl_rx_src_rdy_np <='0';
         --  WAIT UNTIL clk = '1';
 
-        -- -- Test scenario: sending a tlp CfgWr0 to EP receiver
+        -- -------------------------- Checking the NEW configuration space --------------------
+        -- -------------------------- SW access to three different Banks (hdr, EH (PCI-E), PM)
+        -- -- Test scenario: sending a tlp CfgWr0 to EP receiver (SW to HDR)
         -- ep_tl_rx_src_rdy_np <='1';
         -- ep_tl_rx_src_sop<='1';
         -- ep_tl_rx_src_data <= X"44000001"; --Hdr1: CfgWr0, length = 1, 
@@ -489,7 +534,7 @@ BEGIN
         -- ep_tl_rx_src_sop<='0';
         -- ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
         -- WAIT UNTIL clk = '1';
-        -- ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
+        -- ep_tl_rx_src_data <= X"00000009"; --Hdr3: Address: 0 + 2
         -- WAIT UNTIL clk = '1';
         -- ep_tl_rx_src_data <= X"AAAAAAAA"; --Data1: IO Data1
         -- ep_tl_rx_src_eop<='1';
@@ -498,8 +543,8 @@ BEGIN
         -- ep_tl_rx_src_rdy_np <='0';
         -- WAIT UNTIL clk = '1';
 
-        -- WAIT FOR 100 NS;
-        -- -- Test scenario: sending a tlp CfgRd0 to EP receiver
+        -- WAIT FOR 10 NS;
+        -- -- Test scenario: sending a tlp CfgRd0 to EP receiver (SW to HDR)
         -- ep_tl_rx_src_rdy_np <='1';
         -- ep_tl_rx_src_sop<='1';
         -- ep_tl_rx_src_data <= X"04000001"; --Hdr1: CfgRd0, length = 1, 
@@ -508,12 +553,87 @@ BEGIN
         -- ep_tl_rx_src_sop<='0';
         -- ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
         -- WAIT UNTIL clk = '1';
-        -- ep_tl_rx_src_data <= X"00000000"; --Hdr3: Address: 0
+        -- ep_tl_rx_src_data <= X"00000009"; --Hdr3: Address: 0 + 2
         -- ep_tl_rx_src_eop<='1';
         -- WAIT UNTIL clk = '1';
         -- ep_tl_rx_src_eop<='0';
         -- ep_tl_rx_src_rdy_np <='0';
         -- WAIT UNTIL clk = '1';
+        
+        -- WAIT FOR 10 NS;
+        
+        -- -- Test scenario: sending a tlp CfgWr0 to EP receiver (SW to EH CAP)
+        -- ep_tl_rx_src_rdy_np <='1';
+        -- ep_tl_rx_src_sop<='1';
+        -- ep_tl_rx_src_data <= X"44000001"; --Hdr1: CfgWr0, length = 1, 
+        -- WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        -- -- WAIT UNTIL clk='1';
+        -- ep_tl_rx_src_sop<='0';
+        -- ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_data <= X"00000413"; --Hdr3: Address:  256 + 4
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_data <= X"BBBBBBBB"; --Data1: IO Data1
+        -- ep_tl_rx_src_eop<='1';
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_eop<='0';
+        -- ep_tl_rx_src_rdy_np <='0';
+        -- WAIT UNTIL clk = '1';
+
+        -- WAIT FOR 10 NS;
+        -- -- Test scenario: sending a tlp CfgRd0 to EP receiver (SW to EH CAP)
+        -- ep_tl_rx_src_rdy_np <='1';
+        -- ep_tl_rx_src_sop<='1';
+        -- ep_tl_rx_src_data <= X"04000001"; --Hdr1: CfgRd0, length = 1, 
+        -- WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        -- -- WAIT UNTIL clk='1';
+        -- ep_tl_rx_src_sop<='0';
+        -- ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_data <= X"00000413"; --Hdr3: Address: 256 + 4
+        -- ep_tl_rx_src_eop<='1';
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_eop<='0';
+        -- ep_tl_rx_src_rdy_np <='0';
+        -- WAIT UNTIL clk = '1';
+
+        -- WAIT FOR 10 NS;
+
+        -- -- Test scenario: sending a tlp CfgWr0 to EP receiver (SW to PM CAP)
+        -- ep_tl_rx_src_rdy_np <='1';
+        -- ep_tl_rx_src_sop<='1';
+        -- ep_tl_rx_src_data <= X"44000001"; --Hdr1: CfgWr0, length = 1, 
+        -- WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        -- -- WAIT UNTIL clk='1';
+        -- ep_tl_rx_src_sop<='0';
+        -- ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_data <= X"000004B0"; --Hdr3: Address: 300 + 0
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_data <= X"CCCCCCCC"; --Data1: IO Data1
+        -- ep_tl_rx_src_eop<='1';
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_eop<='0';
+        -- ep_tl_rx_src_rdy_np <='0';
+        -- WAIT UNTIL clk = '1';
+
+        -- WAIT FOR 10 NS;
+        -- -- Test scenario: sending a tlp CfgRd0 to EP receiver (SW to PM CAP)
+        -- ep_tl_rx_src_rdy_np <='1';
+        -- ep_tl_rx_src_sop<='1';
+        -- ep_tl_rx_src_data <= X"04000001"; --Hdr1: CfgRd0, length = 1, 
+        -- WAIT UNTIL  (clk='1' AND ep_tl_rx_dst_rdy = '1');
+        -- -- WAIT UNTIL clk='1';
+        -- ep_tl_rx_src_sop<='0';
+        -- ep_tl_rx_src_data <= X"FFFF0000"; --Hdr2: req_ID = X"FFFF"
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_data <= X"000004B0"; --Hdr3: Address: 300 + 0
+        -- ep_tl_rx_src_eop<='1';
+        -- WAIT UNTIL clk = '1';
+        -- ep_tl_rx_src_eop<='0';
+        -- ep_tl_rx_src_rdy_np <='0';
+        -- WAIT UNTIL clk = '1';
+        
         WAIT;
     END PROCESS;
 
